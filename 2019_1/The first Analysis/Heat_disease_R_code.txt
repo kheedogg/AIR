@@ -1,0 +1,348 @@
+setwd('C:\\Users\\kheed\\Desktop\\동아리 AIR\\2019-1st semester activity\\The first Analysis')
+
+all<-read.csv('heart.csv')
+
+?fread
+??fread
+####################install.packages('data.table')
+library(data.table)
+all<-fread('heart.csv')
+
+summary(all)
+#age : 나이
+#sex : (1 = male; 0 = female)
+#cp : 가슴통증 정도
+#trestbps : 혈압
+#chol : 혈청 콜레스테롤 -> 콜레스테롤이 많으면 혈관이 좁아짐
+#fbs : 공복혈당이 120이상인가? 보통 100~109가 정상영역, 120이상 당뇨병영역 (1 = true; 0 = false)
+#restecg : 심전도 결과 (0~2) --데이터 변경--> (0~1)
+#thalach : 최대 심박수 (신생아-1분 약 130회, 5~13세-80~90회, 20세 이상-70~75회)
+#			   (일반적으로 신체가 작을 수록 많음)
+#exang : 움직임으로 인한 협심증 유무, 삼장근처 조이는 것 같은 통증을 협심증이라함 (1 = yes; 0 = no)
+#oldpeak : 심전도로 알수 있는 심전도 신호 하강 정도 -> 하강하면 가슴통증 유발
+#		*사진 설명 첨부
+#slope : 심전도 신호그래프에서 갑자기 꺾이는 정도(심전도 직선 기울기)(0~2)
+#ca : 투시 진단으로 채색한 주요 문제 있는 혈관 수
+#thal : 운동중 휴식중 혈액이 얼마나 잘 흐르는지 검사하는 테스트 결과 
+#       1 = 정상; 2 = 고정 결함; 3 = 되돌릴 수 없는 결함
+#target : 심장병의 유무 1 or 0
+
+
+colnames(all)
+
+all$ca
+all$thal
+all$target
+
+########all$thal '0'-해석불가로 관측치 2행 제거########
+which(all$thal=='0')
+all<-all[-which(all$thal=='0'),]
+summary(all)
+
+install.packages('dplyr')
+library(dplyr)
+glimpse(all)
+
+
+all$sex <- as.factor(all$sex)
+all$cp <- as.factor(all$cp)
+all$fbs <- as.factor(all$fbs)
+all$restecg <- as.factor(all$restecg)
+all$exang <- as.factor(all$exang)
+all$slope <- as.factor(all$slope)
+all$ca <- as.factor(all$ca)
+all$thal <- as.factor(all$thal)
+all$target <- as.factor(all$target)
+
+
+###########################################EDA##################################################3
+
+plot(all)
+
+install.packages('ggplot2')
+library(ggplot2)
+all %>%  ggplot(aes(target,age)) + geom_boxplot() 
+# 심장병 발병유무는 나이와 관계없다고 본다.
+
+
+all %>% group_by(sex,target) %>% tally() %>% group_by(sex) %>% mutate(rate_disease = n / sum(n)) %>%
+	filter(target==1) %>% ggplot(aes(sex,rate_disease,fill=sex)) + geom_bar(stat='identity')
+
+table(all$sex, all$target)	# proportion of events
+prop <- c(0.747,0.451)	# number of trials
+n<-c(95,206)
+( x<-prop*n )	# number of events
+prop.test(x=x, # number of events
+		n=n, #number of trials
+		alternative=c('two.sided'),	# alternative=c('two.sided','less','greater')
+		conf.level=0.95)	# confidence level (= 1-significance level 'alpha')
+
+# 성별간 심장병을 가진 사람의 비율을 모비율 차이검정 결과 p-value가 3.043e-06으로
+# 알파 0.05보다 작으므로 귀무가설인 p1=p2를 기각 시킨다. 즉 두 비율에 대해 차이가 있다고 볼 수 있다.
+
+# 여성의 경우 심장병의 발병인의 비율이 남성보다 크다고 볼 수 있다.
+
+
+all %>% group_by(cp,target) %>% tally %>% group_by(cp) %>% mutate(rate_disease = n/sum(n)) %>%
+	filter(target==1) %>% ggplot(aes(cp,rate_disease,fill=cp)) + geom_bar(stat='identity')
+# 가슴통증 유무와 심장병 발병이 양의 상관계수가 있음을 알 수 있다.
+
+
+
+
+
+
+
+all %>% ggplot(aes(target,trestbps)) + geom_boxplot()
+# 심장병 발병에 따라 혈압의 분포가 거의 동일하므로 혈압과 심장병 발병 간에 관계가 없다고 본다.
+
+all %>% ggplot(aes(target,chol)) + geom_boxplot()
+# 심잘병 발병에 따라 콜레스테롤 수치의 분포가 동일하므로 두 변수 간 관계가 없다고 본다.
+
+all %>% group_by(fbs,target) %>% tally() %>% group_by(fbs) %>% mutate(rate_disease= n/sum(n)) %>%
+	filter(target==1) %>% ggplot(aes(fbs,rate_disease,fill=fbs)) + geom_bar(stat='identity')
+# 공복혈당이 정상인 사람과 아닌 사람 간 심장병 발병 비율이 동일하다고 볼 수 있다. 즉, 두 변수 간 관계가 없다고 본다.
+
+all %>% group_by(restecg,target) %>% tally() %>% group_by(restecg) %>% mutate(rate_disease=n/sum(n)) %>%
+	filter(target==1) %>% ggplot(aes(restecg, rate_disease,fill=restecg)) + geom_bar(stat='identity')
+# 심전도 결과 0: 정상
+# 심전도 결과의 1과 2는 모두 비정상을 일컬으며, 2는 관측치의 개수가 4개 밖에 없으므로 모두 1로 일괄처리한다.
+sum(all$restecg=='2')
+dim(all)
+sum(all$restecg=='2')/dim(all)[1]	# 전체에서 2가 차지하는 비율값
+
+
+
+all$restecg<-ifelse(all$restecg=='2'|all$restecg=='1','1','0')
+str(all)
+sum(all$restecg=='1')	# restecg변수의 1인 관측값 개수
+
+
+all %>% ggplot(aes(target,thalach)) + geom_boxplot()
+
+
+
+all %>% ggplot(aes(thalach)) + geom_histogram()
+# 정규성을 띈다고 볼 수 있다.
+var.test(thalach~target,data=all)
+# p-value가 0.02885로 등분산이라는 귀무가설을 기각한다.
+# 즉, 타겟별 집단의 분산은 다르다고 판별
+t.test(thalach~target, data=all, alternative=c('two.sided'),var.equal=F,conf.level=0.95)
+# p-value가 1.806e-14으로 두 모평균이 같다는 귀무가설을 기각하고
+# 두 모평균은 다르다고 판별.
+
+# thalach(최대 심박수)
+# 심장병이 있으면 최대심박수가 더 크다고 볼 수 있다. 즉, 두 변수간 양의 상관관계가 있다고 볼 수 있다.
+
+
+
+all %>% group_by(exang,target) %>% tally() %>% group_by(rate_disease=n/sum(n)) %>%
+	filter(target==1) %>% ggplot(aes(exang, rate_disease,fill=exang)) + geom_bar(stat='identity')
+
+all %>% group_by(exang,target) %>% tally() %>% group_by(rate_disease=n/sum(n)) %>%
+	filter(target==0) %>% ggplot(aes(exang, rate_disease,fill=exang)) + geom_bar(stat='identity')
+
+# 심장병이 있는 사람 중 협심증 비율이 적게 나타난다. 즉, 심장병과 협심증의 두 변수간 음의 상관관계가 있다고 볼 수 있다.
+
+
+
+all %>% ggplot(aes(oldpeak)) + geom_bar()
+all$oldpeak
+# oldpeak 수가 클 수록 심전도 신호 하강정도 크다.
+# 대부분이 0이므로 가슴통증을 느끼는 사람이 적다고 볼 수 있다. 즉, 협심증을 느끼는 사람의 수가 적다고 할 수 있다.
+
+all %>% ggplot(aes(target,oldpeak)) + geom_boxplot()
+# 위의 결과와 동일하게 심장병을 갖는 사람이 심전도 신호 하강정도가 작은 것을 알 수 있다.
+
+
+
+
+all %>% group_by(slope,target) %>% tally() %>% group_by(slope) %>% mutate(rate_disease=n/sum(n)) %>%
+	filter(target==1) %>% ggplot(aes(slope, rate_disease,fill=slope)) + geom_bar(stat='identity')
+
+all %>% group_by(slope,target) %>% tally() %>% group_by(slope) %>% mutate(rate_disease=n/sum(n)) %>%
+	filter(target==0) %>% ggplot(aes(slope, rate_disease,fill=slope)) + geom_bar(stat='identity')
+
+# 심전도 직선의 기울기로 꺾이는 정도가 2이면 대부분이 심장병을 지닌다고 볼 수 있다.
+# 즉, 심장병이 있는 사람들은 심전도 직선의 기울기 값이 높다고 볼 수 있다.
+# 반대로, 심장병이 없는 사람들은 대체적으로 직선의 기울기 값이 낮은 것을 알 수 있다.
+
+all %>% filter(target==1) %>% ggplot(aes(ca)) + geom_bar()
+all %>% filter(target==0) %>% ggplot(aes(ca)) + geom_bar()
+all %>% ggplot(aes(ca,fill=target)) + geom_bar()
+
+all %>% group_by(ca) %>% tally()
+# 문제 있는 혈관 수가 4개인 사람들의 심장병 발병 비율은 높으나 혈관 개수가 4인 관측치 개수가 5개로 매우 작으므로,
+# 정확도가 떨어진다고 볼 수 있다.
+# 자료상으로 해석하였을 때, 0일때 심장병일 가능성이 크나 상식적으로는 맞지 않다.
+
+summary(all$thal)
+
+
+
+#######################################Analysis####################################################
+
+
+set.seed(201711517)
+n<-nrow(all)
+idx<-1:n
+training_idx<-sample(idx,n*.6)
+idx<-setdiff(idx, training_idx)	# settdiff 차집합 함수
+validate_idx<-sample(idx,n*.2)
+test_idx<-setdiff(idx,validate_idx)
+length(training_idx)
+length(validate_idx)
+length(test_idx)
+training<-all[training_idx,]
+validation<-all[validate_idx,]
+test<-all[test_idx,]
+y_obs<-ifelse(validation$target=='1',1,0)
+
+
+
+
+#####목적변수가 범주형이므로 먼저 로지스틱회귀모형을 만들어보자.
+##첫번째 로지스틱 모형
+all_reg<-glm(target~.,data=all,family='binomial')
+summary(all_reg) # AIC : 221.45
+# intercept, age, chol, fbs, restecg, thalach, exang, oldpeak, slope 변수들 모두 p-value값을 보아
+# 0.05보다 크므로 유의미하지 않다고 볼 수 있다.
+
+install.packages('car')
+library(car)
+vif(all_reg)	# vif값이 10이상을 넘지 않으므로 다중공선성을 보이지 않음.
+# GVIF = Generalized VIF
+
+y_hat_reg<-predict(all_reg, validation)	# 만들어진 모델에 validation 넣어보고 확인
+pred_reg<-prediction(y_hat_reg,y_obs)	# 예측률 확인
+perf_reg<-performance(pred_reg,measure='tpr',x.measure='fpr')
+
+plot(perf_reg, col='black', main='ROC Curve')
+abline(0,1)
+performance(pred_reg,"auc")@y.values[[1]]
+#AUC:0.9214366
+
+##step 써보기
+all_reg_step<-step(all_reg,direction='both')
+summary(all_reg_step)
+vif(all_reg_step)	# vif 값 낮음. 다중공선성 의심 x
+
+
+y_hat_reg_step <- predict(all_reg_step,validation)
+pred_reg_step <-  prediction(y_hat_reg_step,y_obs)
+perf_reg_step <- performance(pred_reg_step, measure='tpr', x.measure = 'fpr')
+
+plot(perf_reg_step,col='black',main='ROC Curve')
+abline(0,1)
+performance(pred_reg_step,'auc')@y.values[[1]]
+# AUC : 0.9248036
+
+###########################################RF#####################################
+#First RF
+
+install.packages('randomForest')
+library(randomForest)
+
+all_rf<-randomForest(target~.,training)
+all_rf
+plot(all_rf)
+
+varImpPlot(all_rf)	#최하위 변수중요도 지닌 두개의 변수 : fbs, slope
+
+
+y_hat_rf<-predict(all_rf,validation,type='prob')[,'1']
+pred_rf<-prediction(y_hat_rf,y_obs)
+perf_rf<-performance(pred_rf,measure='tpr',x.measure='fpr')
+plot(perf_rf,col='red')
+abline(0,1)
+performance(pred_rf,'auc')@y.values[[1]]
+#AUC:0.879349
+
+
+
+##########2nd RF<-최하위 변수중요도 지닌 두개 변수 제거 모델
+( all_rf_2<-randomForest(target~.-fbs-slope,training) )
+plot(all_rf_2)
+
+varImpPlot(all_rf_2)
+
+y_hat_rf_2<-predict(all_rf_2, validation, type='prob')[,'1']
+pred_rf_2<-prediction(y_hat_rf_2, y_obs)
+perf_rf_2<-performance(pred_rf_2,measure='tpr',x.measure='fpr')
+plot(perf_rf_2,col='red')
+abline(0,1)
+performance(pred_rf_2,'auc')@y.values[[1]]
+# AUC : 0.8855219
+
+############3rd RF<-2nd model에서 최하위 변수 중요도 한개 추가로 제거
+( all_rf_3<-randomForest(target~.-fbs-slope-restecg,training) )
+plot(all_rf_3)
+
+varImpPlot(all_rf_3)
+
+y_hat_rf_3<-predict(all_rf_3, validation, type='prob')[,'1']
+pred_rf_3<-prediction(y_hat_rf_3, y_obs)
+perf_rf_3<-performance(pred_rf_3,measure='tpr',x.measure='fpr')
+plot(perf_rf_3,col='red',main='ROC Curve')
+abline(0,1)
+performance(pred_rf_3,'auc')@y.values[[1]]
+# AUC : 0.9006734
+
+
+
+
+
+
+##########RF 단계별 ROC 결과 변화 추이
+plot(perf_reg_step,col='black',main='ROC Curve')
+plot(perf_rf,add=TRUE,col='red')
+plot(perf_rf_2,add=T,col='green')
+plot(perf_rf_3,add=T,col='blue')
+abline(0,1)
+legend('bottomright',inset=.1,legend=c('REG','RF','RF_2','RF_3'),col=c('black','red','green','blue'),lty=1,lwd=2)
+
+performance(pred_rf_3,'auc')@y.values[[1]]
+#AUC
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
